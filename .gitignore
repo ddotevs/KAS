@@ -5,7 +5,8 @@ dist/
 __pycache__/
 *.pyc
 *.pyo
-*.ico
+# Keep images/favicon.ico but ignore generated .ico files in root
+/favicon.ico
 
 # IDE
 .idea/

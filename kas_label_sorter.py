@@ -22,26 +22,29 @@ except ImportError:
     HAS_PIL = False
 
 # Drill bit reference data - lookup by UPS# (RC02 field)
-# Format: UPS#: {'part': Part, 'single_price': SinglePrice, 'pack_price': PackPrice, 'pack_weight': PackWeight}
+# Format: UPS#: {'part': Part, 'pack_price': PackPrice, 'pack_weight': PackWeight}
 DRILL_BIT_DATA = {
-    '3006708': {'part': 'S150104', 'single_price': 0.71, 'pack_price': 8.52, 'pack_weight': 0.08},
-    '3006716': {'part': 'S150105', 'single_price': 0.73, 'pack_price': 8.76, 'pack_weight': 0.10},
-    '3006724': {'part': 'S150106', 'single_price': 0.85, 'pack_price': 10.20, 'pack_weight': 0.12},
-    '3006732': {'part': 'S150107', 'single_price': 0.98, 'pack_price': 11.76, 'pack_weight': 0.16},
-    '3006740': {'part': 'S150108', 'single_price': 1.06, 'pack_price': 12.72, 'pack_weight': 0.20},
-    '3006758': {'part': 'S150109', 'single_price': 1.15, 'pack_price': 13.80, 'pack_weight': 0.26},
-    '3006766': {'part': 'S150110', 'single_price': 1.31, 'pack_price': 15.72, 'pack_weight': 0.30},
-    '3006782': {'part': 'S150112', 'single_price': 1.57, 'pack_price': 18.84, 'pack_weight': 0.44},
-    '3006790': {'part': 'S150113', 'single_price': 1.63, 'pack_price': 19.56, 'pack_weight': 0.50},
-    '3006807': {'part': 'S150114', 'single_price': 2.00, 'pack_price': 24.00, 'pack_weight': 0.56},
-    '3006815': {'part': 'S150115', 'single_price': 2.17, 'pack_price': 26.04, 'pack_weight': 0.68},
-    '3006823': {'part': 'S150116', 'single_price': 2.54, 'pack_price': 30.48, 'pack_weight': 0.82},
-    '3006873': {'part': 'S150121', 'single_price': 3.81, 'pack_price': 22.86, 'pack_weight': 0.68},
-    '3006881': {'part': 'S150122', 'single_price': 4.05, 'pack_price': 24.30, 'pack_weight': 0.78},
-    '3006899': {'part': 'S150123', 'single_price': 4.52, 'pack_price': 27.12, 'pack_weight': 0.88},
-    '3006956': {'part': 'S150129', 'single_price': 6.50, 'pack_price': 39.00, 'pack_weight': 1.46},
-    '3007201': {'part': 'SD50407', 'single_price': 14.38, 'pack_price': 14.38, 'pack_weight': 0.34},
-    '3007227': {'part': 'S160206', 'single_price': 1.99, 'pack_price': 23.88, 'pack_weight': 0.54},
+    '3006683': {'part': 'S150102', 'pack_price': 8.40, 'pack_weight': 0.04},
+    '3006708': {'part': 'S150104', 'pack_price': 8.52, 'pack_weight': 0.08},
+    '3006716': {'part': 'S150105', 'pack_price': 8.76, 'pack_weight': 0.10},
+    '3006724': {'part': 'S150106', 'pack_price': 10.20, 'pack_weight': 0.12},
+    '3006732': {'part': 'S150107', 'pack_price': 11.76, 'pack_weight': 0.16},
+    '3006740': {'part': 'S150108', 'pack_price': 12.72, 'pack_weight': 0.20},
+    '3006758': {'part': 'S150109', 'pack_price': 13.80, 'pack_weight': 0.26},
+    '3006766': {'part': 'S150110', 'pack_price': 15.72, 'pack_weight': 0.30},
+    '3006782': {'part': 'S150112', 'pack_price': 18.84, 'pack_weight': 0.44},
+    '3006790': {'part': 'S150113', 'pack_price': 19.56, 'pack_weight': 0.50},
+    '3006807': {'part': 'S150114', 'pack_price': 24.00, 'pack_weight': 0.56},
+    '3006815': {'part': 'S150115', 'pack_price': 26.04, 'pack_weight': 0.68},
+    '3006823': {'part': 'S150116', 'pack_price': 30.48, 'pack_weight': 0.82},
+    '3006873': {'part': 'S150121', 'pack_price': 22.86, 'pack_weight': 0.68},
+    '3006881': {'part': 'S150122', 'pack_price': 24.30, 'pack_weight': 0.78},
+    '3006899': {'part': 'S150123', 'pack_price': 27.12, 'pack_weight': 0.88},
+    '3006956': {'part': 'S150129', 'pack_price': 39.00, 'pack_weight': 1.46},
+    '3007201': {'part': 'SD50407', 'pack_price': 14.38, 'pack_weight': 0.34},
+    '3007227': {'part': 'S160206', 'pack_price': 23.88, 'pack_weight': 0.54},
+    '3011256': {'part': '2850Max', 'pack_price': 687.51, 'pack_weight': 20.00},
+    '3030423': {'part': '5330', 'pack_price': 0.99, 'pack_weight': 0.01},
 }
 
 
@@ -300,6 +303,7 @@ class LabelSorter:
         self.preview_text.tag_configure('summary_label', foreground='#a0a0a0')
         self.preview_text.tag_configure('summary_value', foreground='#4ecca3', font=('Consolas', 10))
         self.preview_text.tag_configure('cost', foreground='#90EE90', font=('Consolas', 10))
+        self.preview_text.tag_configure('cost_highlight', foreground='#E85D04', font=('Consolas', 10, 'bold'))
         self.preview_text.tag_configure('info', foreground='#87CEEB')
     
     def create_duplicate_tab(self):
@@ -473,28 +477,49 @@ class LabelSorter:
         
         self.sorted_content = '\n'.join(sorted_lines)
         
-        # Calculate order summaries (weight and cost per unique order)
-        order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'items': []})
+        # Calculate order summaries (weight and cost per order group)
+        # Group by first 6 digits of order number (before the "-")
+        order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'sub_orders': set(), 'items': []})
         for order_num, product, address, ups_number, record in records_with_order:
+            # Split order number into base (first 6 digits) and sub-order (last 3 digits)
+            if '-' in order_num:
+                order_base, sub_order = order_num.split('-', 1)
+            else:
+                order_base = order_num
+                sub_order = '000'
+            
+            # Track sub-order numbers for range display
+            order_summaries[order_base]['sub_orders'].add(sub_order)
+            
             # Look up drill bit data by UPS#
             if ups_number in DRILL_BIT_DATA:
                 drill_data = DRILL_BIT_DATA[ups_number]
-                order_summaries[order_num]['weight'] += drill_data['pack_weight']
-                order_summaries[order_num]['cost'] += drill_data['pack_price']
-                order_summaries[order_num]['items'].append({
+                order_summaries[order_base]['weight'] += drill_data['pack_weight']
+                order_summaries[order_base]['cost'] += drill_data['pack_price']
+                order_summaries[order_base]['items'].append({
                     'part': drill_data['part'],
                     'ups': ups_number,
                     'weight': drill_data['pack_weight'],
-                    'cost': drill_data['pack_price']
+                    'cost': drill_data['pack_price'],
+                    'sub_order': sub_order
                 })
             else:
                 # Unknown UPS# - still track it but with zero values
-                order_summaries[order_num]['items'].append({
+                order_summaries[order_base]['items'].append({
                     'part': 'UNKNOWN',
                     'ups': ups_number,
                     'weight': 0.0,
-                    'cost': 0.0
+                    'cost': 0.0,
+                    'sub_order': sub_order
                 })
+        
+        # Convert sub_orders set to order range string
+        for order_base in order_summaries:
+            sub_orders = sorted(order_summaries[order_base]['sub_orders'])
+            if len(sub_orders) == 1:
+                order_summaries[order_base]['order_range'] = sub_orders[0]
+            else:
+                order_summaries[order_base]['order_range'] = f"{sub_orders[0]}-{sub_orders[-1]}"
         
         self.order_summaries = dict(order_summaries)
         
@@ -560,13 +585,13 @@ class LabelSorter:
         
         if hasattr(self, 'order_summaries') and self.order_summaries:
             # Header
-            self.preview_text.insert(tk.END, "═" * 60 + "\n", 'header')
+            self.preview_text.insert(tk.END, "═" * 70 + "\n", 'header')
             self.preview_text.insert(tk.END, "  ORDER SUMMARY\n", 'header')
-            self.preview_text.insert(tk.END, "═" * 60 + "\n\n", 'header')
+            self.preview_text.insert(tk.END, "═" * 70 + "\n\n", 'header')
             
             # Column headers
-            self.preview_text.insert(tk.END, f"  {'Order Number':<18} {'Total Weight':>14} {'Total Cost':>14}\n", 'subheader')
-            self.preview_text.insert(tk.END, "  " + "─" * 50 + "\n", 'summary_label')
+            self.preview_text.insert(tk.END, f"  {'Order #':<10} {'Range':<12} {'Total Weight':>14} {'Total Cost':>14}\n", 'subheader')
+            self.preview_text.insert(tk.END, "  " + "─" * 54 + "\n", 'summary_label')
             
             # Calculate grand totals
             grand_weight = 0.0
@@ -577,23 +602,33 @@ class LabelSorter:
                 summary = self.order_summaries[order_num]
                 weight = summary['weight']
                 cost = summary['cost']
+                order_range = summary.get('order_range', '')
                 grand_weight += weight
                 grand_cost += cost
                 
                 self.preview_text.insert(tk.END, f"  ", 'summary_label')
-                self.preview_text.insert(tk.END, f"{order_num:<18}", 'order_num')
+                self.preview_text.insert(tk.END, f"{order_num:<10}", 'order_num')
+                self.preview_text.insert(tk.END, f" {order_range:<11}", 'summary_label')
                 self.preview_text.insert(tk.END, f" {weight:>12.2f} lb", 'summary_value')
-                self.preview_text.insert(tk.END, f" {cost:>13.2f}\n", 'cost')
+                
+                # Highlight costs >= $100 in orange
+                if cost >= 100:
+                    self.preview_text.insert(tk.END, f" ${cost:>12.2f}\n", 'cost_highlight')
+                else:
+                    self.preview_text.insert(tk.END, f" ${cost:>12.2f}\n", 'cost')
             
             # Grand totals
-            self.preview_text.insert(tk.END, "  " + "─" * 50 + "\n", 'summary_label')
-            self.preview_text.insert(tk.END, f"  {'GRAND TOTAL':<18}", 'header')
+            self.preview_text.insert(tk.END, "  " + "─" * 54 + "\n", 'summary_label')
+            self.preview_text.insert(tk.END, f"  {'TOTAL':<10} {'':<12}", 'header')
             self.preview_text.insert(tk.END, f" {grand_weight:>12.2f} lb", 'summary_value')
-            self.preview_text.insert(tk.END, f" ${grand_cost:>12.2f}\n", 'cost')
+            if grand_cost >= 100:
+                self.preview_text.insert(tk.END, f" ${grand_cost:>12.2f}\n", 'cost_highlight')
+            else:
+                self.preview_text.insert(tk.END, f" ${grand_cost:>12.2f}\n", 'cost')
             
-            self.preview_text.insert(tk.END, "\n" + "═" * 60 + "\n", 'header')
+            self.preview_text.insert(tk.END, "\n" + "═" * 70 + "\n", 'header')
             self.preview_text.insert(tk.END, f"  Total Unique Orders: {len(self.order_summaries)}\n", 'info')
-            self.preview_text.insert(tk.END, "═" * 60 + "\n", 'header')
+            self.preview_text.insert(tk.END, "═" * 70 + "\n", 'header')
         
         self.preview_text.config(state='disabled')
     
