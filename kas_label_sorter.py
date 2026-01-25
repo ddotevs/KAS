@@ -479,7 +479,7 @@ class LabelSorter:
         
         # Calculate order summaries (weight and cost per order group)
         # Group by first 6 digits of order number (before the "-")
-        order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'sub_orders': set(), 'items': []})
+        order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'sub_orders': set()})
         for order_num, product, address, ups_number, record in records_with_order:
             # Split order number into base (first 6 digits) and sub-order (last 3 digits)
             if '-' in order_num:
@@ -491,27 +491,11 @@ class LabelSorter:
             # Track sub-order numbers for range display
             order_summaries[order_base]['sub_orders'].add(sub_order)
             
-            # Look up drill bit data by UPS#
+            # Look up data by UPS# - only include known items in totals
             if ups_number in DRILL_BIT_DATA:
                 drill_data = DRILL_BIT_DATA[ups_number]
                 order_summaries[order_base]['weight'] += drill_data['pack_weight']
                 order_summaries[order_base]['cost'] += drill_data['pack_price']
-                order_summaries[order_base]['items'].append({
-                    'part': drill_data['part'],
-                    'ups': ups_number,
-                    'weight': drill_data['pack_weight'],
-                    'cost': drill_data['pack_price'],
-                    'sub_order': sub_order
-                })
-            else:
-                # Unknown UPS# - still track it but with zero values
-                order_summaries[order_base]['items'].append({
-                    'part': 'UNKNOWN',
-                    'ups': ups_number,
-                    'weight': 0.0,
-                    'cost': 0.0,
-                    'sub_order': sub_order
-                })
         
         # Convert sub_orders set to order range string
         for order_base in order_summaries:
@@ -613,18 +597,17 @@ class LabelSorter:
                 
                 # Highlight costs >= $100 in orange
                 if cost >= 100:
-                    self.preview_text.insert(tk.END, f" ${cost:>12.2f}\n", 'cost_highlight')
+                    self.preview_text.insert(tk.END, f" {cost:>13.2f}\n", 'cost_highlight')
                 else:
-                    self.preview_text.insert(tk.END, f" ${cost:>12.2f}\n", 'cost')
+                    self.preview_text.insert(tk.END, f" {cost:>13.2f}\n", 'cost')
             
-            # Grand totals
+            # Grand total (cost only)
             self.preview_text.insert(tk.END, "  " + "─" * 54 + "\n", 'summary_label')
-            self.preview_text.insert(tk.END, f"  {'TOTAL':<10} {'':<12}", 'header')
-            self.preview_text.insert(tk.END, f" {grand_weight:>12.2f} lb", 'summary_value')
+            self.preview_text.insert(tk.END, f"  {'TOTAL':<10} {'':<12} {'':<15}", 'header')
             if grand_cost >= 100:
-                self.preview_text.insert(tk.END, f" ${grand_cost:>12.2f}\n", 'cost_highlight')
+                self.preview_text.insert(tk.END, f" {grand_cost:>13.2f}\n", 'cost_highlight')
             else:
-                self.preview_text.insert(tk.END, f" ${grand_cost:>12.2f}\n", 'cost')
+                self.preview_text.insert(tk.END, f" {grand_cost:>13.2f}\n", 'cost')
             
             self.preview_text.insert(tk.END, "\n" + "═" * 70 + "\n", 'header')
             self.preview_text.insert(tk.END, f"  Total Unique Orders: {len(self.order_summaries)}\n", 'info')
