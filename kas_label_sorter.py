@@ -153,8 +153,10 @@ class LabelSorter:
                     logo = logo.resize((new_width, max_height), Image.Resampling.LANCZOS)
                     self.logo_image = ImageTk.PhotoImage(logo)
                     
-                    logo_label = tk.Label(header_frame, image=self.logo_image, bg='#e8e4e0')
+                    logo_label = tk.Label(header_frame, image=self.logo_image, bg='#e8e4e0', cursor='hand2')
                     logo_label.pack()
+                    # Secret menu: triple-click on logo
+                    logo_label.bind('<Triple-Button-1>', self.open_secret_menu)
                 else:
                     # Fallback to text if no logo
                     self._create_text_header(header_frame)
@@ -278,9 +280,12 @@ class LabelSorter:
             text="KAS Enterprises",
             font=('Segoe UI', 24, 'bold'),
             bg='#e8e4e0',
-            fg='#E85D04'
+            fg='#E85D04',
+            cursor='hand2'
         )
         title_label.pack()
+        # Secret menu: triple-click on header
+        title_label.bind('<Triple-Button-1>', self.open_secret_menu)
     
     def create_preview_text(self):
         """Create the preview text widget (replaces placeholder)"""
@@ -861,6 +866,259 @@ class LabelSorter:
                 self.report_text.insert(tk.END, f"{product_display}\n")
         
         self.report_text.config(state='disabled')
+    
+    def open_secret_menu(self, event=None):
+        """Open the secret reference data editor (triggered by triple-click on logo)"""
+        global PRODUCT_DATA
+        
+        # Create the secret menu window
+        editor = tk.Toplevel(self.root)
+        editor.title("🔧 Reference Data Editor")
+        editor.geometry("700x500")
+        editor.configure(bg='#1a1a1a')
+        editor.transient(self.root)
+        
+        # Center the window
+        editor.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - 700) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 500) // 2
+        editor.geometry(f"+{x}+{y}")
+        
+        # Header
+        header = tk.Label(
+            editor,
+            text="🔐 Secret Menu - Reference Data Editor",
+            font=('Segoe UI', 14, 'bold'),
+            bg='#1a1a1a',
+            fg='#E85D04'
+        )
+        header.pack(pady=(15, 5))
+        
+        subtitle = tk.Label(
+            editor,
+            text="Triple-click unlocked! Edit product prices and weights below.",
+            font=('Segoe UI', 10),
+            bg='#1a1a1a',
+            fg='#888888'
+        )
+        subtitle.pack(pady=(0, 10))
+        
+        # Create frame for the data list
+        list_frame = tk.Frame(editor, bg='#1a1a1a')
+        list_frame.pack(fill='both', expand=True, padx=20, pady=10)
+        
+        # Column headers
+        header_frame = tk.Frame(list_frame, bg='#2a2a2a')
+        header_frame.pack(fill='x')
+        
+        tk.Label(header_frame, text="UPS#", font=('Consolas', 10, 'bold'), bg='#2a2a2a', fg='#E85D04', width=12).pack(side='left', padx=5)
+        tk.Label(header_frame, text="Part", font=('Consolas', 10, 'bold'), bg='#2a2a2a', fg='#E85D04', width=12).pack(side='left', padx=5)
+        tk.Label(header_frame, text="Price", font=('Consolas', 10, 'bold'), bg='#2a2a2a', fg='#E85D04', width=10).pack(side='left', padx=5)
+        tk.Label(header_frame, text="Weight", font=('Consolas', 10, 'bold'), bg='#2a2a2a', fg='#E85D04', width=10).pack(side='left', padx=5)
+        tk.Label(header_frame, text="Actions", font=('Consolas', 10, 'bold'), bg='#2a2a2a', fg='#E85D04', width=15).pack(side='left', padx=5)
+        
+        # Scrollable list of items
+        canvas = tk.Canvas(list_frame, bg='#1a1a1a', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg='#1a1a1a')
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        scrollbar.pack(side='right', fill='y')
+        canvas.pack(side='left', fill='both', expand=True)
+        
+        # Store entry widgets for editing
+        entry_widgets = {}
+        
+        def refresh_list():
+            """Refresh the list of products"""
+            for widget in scrollable_frame.winfo_children():
+                widget.destroy()
+            entry_widgets.clear()
+            
+            for ups_num in sorted(PRODUCT_DATA.keys()):
+                data = PRODUCT_DATA[ups_num]
+                row = tk.Frame(scrollable_frame, bg='#1a1a1a')
+                row.pack(fill='x', pady=2)
+                
+                # UPS# (read-only display)
+                tk.Label(row, text=ups_num, font=('Consolas', 9), bg='#1a1a1a', fg='#cccccc', width=12).pack(side='left', padx=5)
+                
+                # Part
+                part_entry = tk.Entry(row, font=('Consolas', 9), bg='#2a2a2a', fg='#90EE90', width=12, insertbackground='white')
+                part_entry.insert(0, data.get('part', ''))
+                part_entry.pack(side='left', padx=5)
+                
+                # Price
+                price_entry = tk.Entry(row, font=('Consolas', 9), bg='#2a2a2a', fg='#87CEEB', width=10, insertbackground='white')
+                price_entry.insert(0, f"{data.get('pack_price', 0):.2f}")
+                price_entry.pack(side='left', padx=5)
+                
+                # Weight
+                weight_entry = tk.Entry(row, font=('Consolas', 9), bg='#2a2a2a', fg='#ffd700', width=10, insertbackground='white')
+                weight_entry.insert(0, f"{data.get('pack_weight', 0):.2f}")
+                weight_entry.pack(side='left', padx=5)
+                
+                entry_widgets[ups_num] = {
+                    'part': part_entry,
+                    'price': price_entry,
+                    'weight': weight_entry
+                }
+                
+                # Delete button
+                del_btn = tk.Button(
+                    row, text="🗑️ Delete", font=('Segoe UI', 8),
+                    bg='#8B0000', fg='white', padx=5,
+                    command=lambda u=ups_num: delete_item(u)
+                )
+                del_btn.pack(side='left', padx=5)
+        
+        def delete_item(ups_num):
+            """Delete an item from reference data"""
+            if messagebox.askyesno("Confirm Delete", f"Delete UPS# {ups_num}?"):
+                del PRODUCT_DATA[ups_num]
+                refresh_list()
+        
+        def add_new_item():
+            """Open dialog to add a new item"""
+            add_dialog = tk.Toplevel(editor)
+            add_dialog.title("Add New Product")
+            add_dialog.geometry("300x200")
+            add_dialog.configure(bg='#1a1a1a')
+            add_dialog.transient(editor)
+            add_dialog.grab_set()
+            
+            # Center
+            add_dialog.update_idletasks()
+            x = editor.winfo_x() + (editor.winfo_width() - 300) // 2
+            y = editor.winfo_y() + (editor.winfo_height() - 200) // 2
+            add_dialog.geometry(f"+{x}+{y}")
+            
+            tk.Label(add_dialog, text="Add New Product", font=('Segoe UI', 12, 'bold'), bg='#1a1a1a', fg='#E85D04').pack(pady=10)
+            
+            fields_frame = tk.Frame(add_dialog, bg='#1a1a1a')
+            fields_frame.pack(pady=10)
+            
+            tk.Label(fields_frame, text="UPS#:", bg='#1a1a1a', fg='#cccccc').grid(row=0, column=0, sticky='e', padx=5, pady=3)
+            ups_entry = tk.Entry(fields_frame, bg='#2a2a2a', fg='white', insertbackground='white')
+            ups_entry.grid(row=0, column=1, padx=5, pady=3)
+            
+            tk.Label(fields_frame, text="Part:", bg='#1a1a1a', fg='#cccccc').grid(row=1, column=0, sticky='e', padx=5, pady=3)
+            part_entry = tk.Entry(fields_frame, bg='#2a2a2a', fg='white', insertbackground='white')
+            part_entry.grid(row=1, column=1, padx=5, pady=3)
+            
+            tk.Label(fields_frame, text="Price:", bg='#1a1a1a', fg='#cccccc').grid(row=2, column=0, sticky='e', padx=5, pady=3)
+            price_entry = tk.Entry(fields_frame, bg='#2a2a2a', fg='white', insertbackground='white')
+            price_entry.grid(row=2, column=1, padx=5, pady=3)
+            
+            tk.Label(fields_frame, text="Weight:", bg='#1a1a1a', fg='#cccccc').grid(row=3, column=0, sticky='e', padx=5, pady=3)
+            weight_entry = tk.Entry(fields_frame, bg='#2a2a2a', fg='white', insertbackground='white')
+            weight_entry.grid(row=3, column=1, padx=5, pady=3)
+            
+            def do_add():
+                ups = ups_entry.get().strip()
+                part = part_entry.get().strip()
+                try:
+                    price = float(price_entry.get().strip())
+                    weight = float(weight_entry.get().strip())
+                except ValueError:
+                    messagebox.showerror("Error", "Price and Weight must be numbers")
+                    return
+                
+                if not ups:
+                    messagebox.showerror("Error", "UPS# is required")
+                    return
+                
+                if ups in PRODUCT_DATA:
+                    messagebox.showerror("Error", f"UPS# {ups} already exists")
+                    return
+                
+                PRODUCT_DATA[ups] = {
+                    'part': part,
+                    'pack_price': price,
+                    'pack_weight': weight
+                }
+                add_dialog.destroy()
+                refresh_list()
+            
+            btn_frame = tk.Frame(add_dialog, bg='#1a1a1a')
+            btn_frame.pack(pady=10)
+            tk.Button(btn_frame, text="Add", command=do_add, bg='#E85D04', fg='white', font=('Segoe UI', 10, 'bold'), padx=15).pack(side='left', padx=5)
+            tk.Button(btn_frame, text="Cancel", command=add_dialog.destroy, bg='#6B6B6B', fg='white', font=('Segoe UI', 10), padx=15).pack(side='left', padx=5)
+        
+        def save_all_changes():
+            """Save all changes to the JSON file"""
+            # Update PRODUCT_DATA from entry widgets
+            for ups_num, widgets in entry_widgets.items():
+                try:
+                    PRODUCT_DATA[ups_num] = {
+                        'part': widgets['part'].get().strip(),
+                        'pack_price': float(widgets['price'].get().strip()),
+                        'pack_weight': float(widgets['weight'].get().strip())
+                    }
+                except ValueError:
+                    messagebox.showerror("Error", f"Invalid number format for UPS# {ups_num}")
+                    return
+            
+            # Save to JSON file
+            try:
+                json_path = get_reference_data_path()
+                # For compiled EXE, save to the same directory as the EXE
+                if hasattr(sys, '_MEIPASS'):
+                    json_path = os.path.join(os.path.dirname(sys.executable), 'reference_data.json')
+                
+                data = {
+                    "products": PRODUCT_DATA,
+                    "_comments": {
+                        "description": "Reference data for KAS Label Sorter - Products lookup by UPS# (RC02 field)",
+                        "format": "UPS#: {part: PartNumber, pack_price: Price, pack_weight: Weight in lbs}"
+                    }
+                }
+                
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+                
+                messagebox.showinfo("Saved", f"Reference data saved successfully!\n\n{json_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not save: {e}")
+        
+        # Initial list population
+        refresh_list()
+        
+        # Button frame
+        btn_frame = tk.Frame(editor, bg='#1a1a1a')
+        btn_frame.pack(pady=15)
+        
+        tk.Button(
+            btn_frame, text="➕ Add New", command=add_new_item,
+            bg='#228B22', fg='white', font=('Segoe UI', 10, 'bold'), padx=15, pady=5
+        ).pack(side='left', padx=10)
+        
+        tk.Button(
+            btn_frame, text="💾 Save All Changes", command=save_all_changes,
+            bg='#E85D04', fg='white', font=('Segoe UI', 10, 'bold'), padx=15, pady=5
+        ).pack(side='left', padx=10)
+        
+        tk.Button(
+            btn_frame, text="Close", command=editor.destroy,
+            bg='#6B6B6B', fg='white', font=('Segoe UI', 10), padx=15, pady=5
+        ).pack(side='left', padx=10)
+        
+        # Info label at bottom
+        info_label = tk.Label(
+            editor,
+            text=f"📂 Data file: {get_reference_data_path()}",
+            font=('Segoe UI', 8),
+            bg='#1a1a1a',
+            fg='#555555'
+        )
+        info_label.pack(pady=(0, 10))
     
     def save_sorted_file(self):
         """Save the sorted content to a file"""
