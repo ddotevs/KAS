@@ -39,8 +39,8 @@ echo.
 echo [2/2] Building EXE file...
 echo.
 
-REM Build the EXE with PyInstaller, including images from images folder
-pyinstaller --onefile --windowed --name "KAS_Label_Sorter" --icon=images/favicon.ico --add-data "images/Logo.png;images" --add-data "images/favicon.ico;images" kas_label_sorter.py
+REM Build the EXE with PyInstaller, including images and reference data
+pyinstaller --onefile --windowed --name "KAS_Label_Sorter" --icon=images/favicon.ico --add-data "images/Logo.png;images" --add-data "images/favicon.ico;images" --add-data "reference_data.json;." kas_label_sorter.py
 
 echo.
 echo ==================================================================================

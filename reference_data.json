@@ -1,0 +1,30 @@
+{
+  "products": {
+    "3006683": {"part": "S150102", "pack_price": 8.40, "pack_weight": 0.04},
+    "3006708": {"part": "S150104", "pack_price": 8.52, "pack_weight": 0.08},
+    "3006716": {"part": "S150105", "pack_price": 8.76, "pack_weight": 0.10},
+    "3006724": {"part": "S150106", "pack_price": 10.20, "pack_weight": 0.12},
+    "3006732": {"part": "S150107", "pack_price": 11.76, "pack_weight": 0.16},
+    "3006740": {"part": "S150108", "pack_price": 12.72, "pack_weight": 0.20},
+    "3006758": {"part": "S150109", "pack_price": 13.80, "pack_weight": 0.26},
+    "3006766": {"part": "S150110", "pack_price": 15.72, "pack_weight": 0.30},
+    "3006782": {"part": "S150112", "pack_price": 18.84, "pack_weight": 0.44},
+    "3006790": {"part": "S150113", "pack_price": 19.56, "pack_weight": 0.50},
+    "3006807": {"part": "S150114", "pack_price": 24.00, "pack_weight": 0.56},
+    "3006815": {"part": "S150115", "pack_price": 26.04, "pack_weight": 0.68},
+    "3006823": {"part": "S150116", "pack_price": 30.48, "pack_weight": 0.82},
+    "3006873": {"part": "S150121", "pack_price": 22.86, "pack_weight": 0.68},
+    "3006881": {"part": "S150122", "pack_price": 24.30, "pack_weight": 0.78},
+    "3006899": {"part": "S150123", "pack_price": 27.12, "pack_weight": 0.88},
+    "3006956": {"part": "S150129", "pack_price": 39.00, "pack_weight": 1.46},
+    "3007201": {"part": "SD50407", "pack_price": 14.38, "pack_weight": 0.34},
+    "3007227": {"part": "S160206", "pack_price": 23.88, "pack_weight": 0.54},
+    "3011256": {"part": "2850Max", "pack_price": 687.51, "pack_weight": 20.00},
+    "3030423": {"part": "5330", "pack_price": 0.99, "pack_weight": 0.01}
+  },
+  "_comments": {
+    "description": "Reference data for KAS Label Sorter - Products lookup by UPS# (RC02 field)",
+    "format": "UPS#: {part: PartNumber, pack_price: Price, pack_weight: Weight in lbs}"
+  }
+}
+

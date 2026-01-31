@@ -9,6 +9,7 @@ from tkinter import ttk, filedialog, messagebox
 import re
 import os
 import sys
+import json
 import tempfile
 import subprocess
 from datetime import datetime
@@ -21,31 +22,40 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# Drill bit reference data - lookup by UPS# (RC02 field)
-# Format: UPS#: {'part': Part, 'pack_price': PackPrice, 'pack_weight': PackWeight}
-DRILL_BIT_DATA = {
-    '3006683': {'part': 'S150102', 'pack_price': 8.40, 'pack_weight': 0.04},
-    '3006708': {'part': 'S150104', 'pack_price': 8.52, 'pack_weight': 0.08},
-    '3006716': {'part': 'S150105', 'pack_price': 8.76, 'pack_weight': 0.10},
-    '3006724': {'part': 'S150106', 'pack_price': 10.20, 'pack_weight': 0.12},
-    '3006732': {'part': 'S150107', 'pack_price': 11.76, 'pack_weight': 0.16},
-    '3006740': {'part': 'S150108', 'pack_price': 12.72, 'pack_weight': 0.20},
-    '3006758': {'part': 'S150109', 'pack_price': 13.80, 'pack_weight': 0.26},
-    '3006766': {'part': 'S150110', 'pack_price': 15.72, 'pack_weight': 0.30},
-    '3006782': {'part': 'S150112', 'pack_price': 18.84, 'pack_weight': 0.44},
-    '3006790': {'part': 'S150113', 'pack_price': 19.56, 'pack_weight': 0.50},
-    '3006807': {'part': 'S150114', 'pack_price': 24.00, 'pack_weight': 0.56},
-    '3006815': {'part': 'S150115', 'pack_price': 26.04, 'pack_weight': 0.68},
-    '3006823': {'part': 'S150116', 'pack_price': 30.48, 'pack_weight': 0.82},
-    '3006873': {'part': 'S150121', 'pack_price': 22.86, 'pack_weight': 0.68},
-    '3006881': {'part': 'S150122', 'pack_price': 24.30, 'pack_weight': 0.78},
-    '3006899': {'part': 'S150123', 'pack_price': 27.12, 'pack_weight': 0.88},
-    '3006956': {'part': 'S150129', 'pack_price': 39.00, 'pack_weight': 1.46},
-    '3007201': {'part': 'SD50407', 'pack_price': 14.38, 'pack_weight': 0.34},
-    '3007227': {'part': 'S160206', 'pack_price': 23.88, 'pack_weight': 0.54},
-    '3011256': {'part': '2850Max', 'pack_price': 687.51, 'pack_weight': 20.00},
-    '3030423': {'part': '5330', 'pack_price': 0.99, 'pack_weight': 0.01},
-}
+# UPS# for item 5330 - special consolidation logic applies
+ITEM_5330_UPS = '3030423'
+
+
+def get_reference_data_path():
+    """Get the path to reference_data.json, works for dev and PyInstaller"""
+    if hasattr(sys, '_MEIPASS'):
+        # Running as compiled EXE
+        return os.path.join(sys._MEIPASS, 'reference_data.json')
+    else:
+        # Running as script
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reference_data.json')
+
+
+def load_reference_data():
+    """Load product reference data from JSON file"""
+    try:
+        json_path = get_reference_data_path()
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get('products', {})
+    except FileNotFoundError:
+        print(f"Warning: reference_data.json not found. Using empty reference data.")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Warning: Error parsing reference_data.json: {e}")
+        return {}
+    except Exception as e:
+        print(f"Warning: Could not load reference_data.json: {e}")
+        return {}
+
+
+# Load reference data from JSON file
+PRODUCT_DATA = load_reference_data()
 
 
 def get_resource_path(filename):
@@ -436,6 +446,26 @@ class LabelSorter:
                 combined += stripped
         return combined
     
+    def update_case_qty(self, record, new_qty):
+        """Update the Case QTY value in a record (for 5330 consolidation)"""
+        # RC19 contains "PINK TAG ITEM *** CASE QTY:     X"
+        # We need to update the quantity value
+        updated_record = []
+        for line in record:
+            # Look for the CASE QTY pattern and update it
+            if 'CASE QTY:' in line:
+                # Replace the number after CASE QTY: with the new quantity
+                # Pattern: "CASE QTY:     1" -> "CASE QTY:    10"
+                updated_line = re.sub(
+                    r'(CASE QTY:\s*)(\d+)',
+                    lambda m: f"{m.group(1)}{new_qty:>5}",
+                    line
+                )
+                updated_record.append(updated_line)
+            else:
+                updated_record.append(line)
+        return updated_record
+    
     def process_file(self, file_path):
         """Process the input file"""
         self.input_file_path = file_path
@@ -469,18 +499,70 @@ class LabelSorter:
         records_with_order.sort(key=lambda x: x[0])
         self.records_data = records_with_order
         
+        # Separate 5330 items for special consolidation logic
+        item_5330_records = defaultdict(list)  # Group by full order number
+        other_records = []
+        
+        for order_num, product, address, ups_number, record in records_with_order:
+            if ups_number == ITEM_5330_UPS:
+                # 5330 item - group by full order number (including suffix)
+                item_5330_records[order_num].append((order_num, product, address, ups_number, record))
+            else:
+                other_records.append((order_num, product, address, ups_number, record))
+        
         # Generate single-line output (stored in memory for printing)
         sorted_lines = []
-        for order_num, product, address, ups_number, record in records_with_order:
+        
+        # Process 5330 items: consolidate duplicates and update Case QTY
+        for order_num in sorted(item_5330_records.keys()):
+            records_list = item_5330_records[order_num]
+            qty = len(records_list)
+            # Use the first record as the template, update Case QTY
+            first_record = records_list[0][4]  # The record is the 5th element
+            updated_record = self.update_case_qty(first_record, qty)
+            single_line = self.record_to_single_line(updated_record)
+            sorted_lines.append(single_line)
+        
+        # Process other items normally
+        for order_num, product, address, ups_number, record in other_records:
             single_line = self.record_to_single_line(record)
             sorted_lines.append(single_line)
         
+        # Re-sort all lines by order number (they're embedded in the content)
+        # Extract order number from each line for final sort
+        def extract_order_from_line(line):
+            match = re.search(r'\{RC25;ORD#\s*(\d+-\d+)\|?\}', line)
+            return match.group(1) if match else '000000-000'
+        
+        sorted_lines.sort(key=extract_order_from_line)
         self.sorted_content = '\n'.join(sorted_lines)
         
         # Calculate order summaries (weight and cost per order group)
-        # Group by first 6 digits of order number (before the "-")
+        # For 5330 items: group by full order number (including suffix)
+        # For other items: group by first 6 digits of order number (before the "-")
         order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'sub_orders': set()})
-        for order_num, product, address, ups_number, record in records_with_order:
+        
+        # Process 5330 items separately - group by full order number
+        for order_num in item_5330_records.keys():
+            qty = len(item_5330_records[order_num])
+            
+            # Split order number into base and sub-order
+            if '-' in order_num:
+                order_base, sub_order = order_num.split('-', 1)
+            else:
+                order_base = order_num
+                sub_order = '000'
+            
+            order_summaries[order_base]['sub_orders'].add(sub_order)
+            
+            # Calculate cost and weight for consolidated 5330 items
+            if ITEM_5330_UPS in PRODUCT_DATA:
+                product_data = PRODUCT_DATA[ITEM_5330_UPS]
+                order_summaries[order_base]['weight'] += product_data['pack_weight'] * qty
+                order_summaries[order_base]['cost'] += product_data['pack_price'] * qty
+        
+        # Process other items normally
+        for order_num, product, address, ups_number, record in other_records:
             # Split order number into base (first 6 digits) and sub-order (last 3 digits)
             if '-' in order_num:
                 order_base, sub_order = order_num.split('-', 1)
@@ -492,10 +574,10 @@ class LabelSorter:
             order_summaries[order_base]['sub_orders'].add(sub_order)
             
             # Look up data by UPS# - only include known items in totals
-            if ups_number in DRILL_BIT_DATA:
-                drill_data = DRILL_BIT_DATA[ups_number]
-                order_summaries[order_base]['weight'] += drill_data['pack_weight']
-                order_summaries[order_base]['cost'] += drill_data['pack_price']
+            if ups_number in PRODUCT_DATA:
+                product_info = PRODUCT_DATA[ups_number]
+                order_summaries[order_base]['weight'] += product_info['pack_weight']
+                order_summaries[order_base]['cost'] += product_info['pack_price']
         
         # Convert sub_orders set to order range string
         for order_base in order_summaries:
