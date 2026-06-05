@@ -25,37 +25,92 @@ except ImportError:
 # UPS# for item 5330 - special consolidation logic applies
 ITEM_5330_UPS = '3030423'
 
+# Built-in product reference data — shipped with the EXE as defaults.
+# User modifications are stored in %APPDATA%/KAS/product_data.json and merged on startup.
+DEFAULT_PRODUCT_DATA = {
+    '3006683': {'part': 'S150102', 'pack_price': 8.40, 'pack_weight': 0.04},
+    '3006708': {'part': 'S150104', 'pack_price': 8.52, 'pack_weight': 0.08},
+    '3006716': {'part': 'S150105', 'pack_price': 8.76, 'pack_weight': 0.10},
+    '3006724': {'part': 'S150106', 'pack_price': 10.20, 'pack_weight': 0.12},
+    '3006732': {'part': 'S150107', 'pack_price': 11.76, 'pack_weight': 0.16},
+    '3006740': {'part': 'S150108', 'pack_price': 12.72, 'pack_weight': 0.20},
+    '3006758': {'part': 'S150109', 'pack_price': 13.80, 'pack_weight': 0.26},
+    '3006766': {'part': 'S150110', 'pack_price': 15.72, 'pack_weight': 0.30},
+    '3006782': {'part': 'S150112', 'pack_price': 18.84, 'pack_weight': 0.44},
+    '3006790': {'part': 'S150113', 'pack_price': 19.56, 'pack_weight': 0.50},
+    '3006807': {'part': 'S150114', 'pack_price': 24.00, 'pack_weight': 0.56},
+    '3006815': {'part': 'S150115', 'pack_price': 26.04, 'pack_weight': 0.68},
+    '3006823': {'part': 'S150116', 'pack_price': 30.48, 'pack_weight': 0.82},
+    '3006873': {'part': 'S150121', 'pack_price': 22.86, 'pack_weight': 0.68},
+    '3006881': {'part': 'S150122', 'pack_price': 24.30, 'pack_weight': 0.78},
+    '3006899': {'part': 'S150123', 'pack_price': 27.12, 'pack_weight': 0.88},
+    '3006956': {'part': 'S150129', 'pack_price': 39.00, 'pack_weight': 1.46},
+    '3007201': {'part': 'SD50407', 'pack_price': 14.38, 'pack_weight': 0.34},
+    '3007227': {'part': 'S160206', 'pack_price': 23.88, 'pack_weight': 0.54},
+    '3011256': {'part': '2850Max', 'pack_price': 687.51, 'pack_weight': 20.00},
+    '3030423': {'part': 'SAS5330', 'pack_price': 0.99, 'pack_weight': 0.01},
+}
 
-def get_reference_data_path():
-    """Get the path to reference_data.json, works for dev and PyInstaller"""
-    if hasattr(sys, '_MEIPASS'):
-        # Running as compiled EXE
-        return os.path.join(sys._MEIPASS, 'reference_data.json')
+
+def get_appdata_dir():
+    """Get the KAS config directory in AppData"""
+    if sys.platform == 'win32':
+        appdata = os.environ.get('APPDATA', os.path.expanduser('~'))
     else:
-        # Running as script
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reference_data.json')
+        appdata = os.path.expanduser('~')
+    kas_dir = os.path.join(appdata, 'KAS')
+    os.makedirs(kas_dir, exist_ok=True)
+    return kas_dir
 
 
-def load_reference_data():
-    """Load product reference data from JSON file"""
+def get_product_data_path():
+    """Get the path to the user's product data file in AppData"""
+    return os.path.join(get_appdata_dir(), 'product_data.json')
+
+
+def load_product_data():
+    """Load product data with merge logic: user edits are preserved, new items are added."""
+    config_path = get_product_data_path()
+
+    if not os.path.exists(config_path):
+        # First run — write defaults and return them
+        save_product_data(DEFAULT_PRODUCT_DATA)
+        return dict(DEFAULT_PRODUCT_DATA)
+
     try:
-        json_path = get_reference_data_path()
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data.get('products', {})
-    except FileNotFoundError:
-        print(f"Warning: reference_data.json not found. Using empty reference data.")
-        return {}
-    except json.JSONDecodeError as e:
-        print(f"Warning: Error parsing reference_data.json: {e}")
-        return {}
-    except Exception as e:
-        print(f"Warning: Could not load reference_data.json: {e}")
-        return {}
+        with open(config_path, 'r', encoding='utf-8') as f:
+            saved = json.load(f)
+        # Handle both flat format and nested {"products": {...}} format
+        if 'products' in saved and isinstance(saved['products'], dict):
+            saved = saved['products']
+    except (json.JSONDecodeError, IOError):
+        # Corrupt file — reset to defaults
+        save_product_data(DEFAULT_PRODUCT_DATA)
+        return dict(DEFAULT_PRODUCT_DATA)
+
+    # Merge: add any new items from defaults that aren't in user file
+    merged = dict(saved)
+    changed = False
+    for ups_num, default_item in DEFAULT_PRODUCT_DATA.items():
+        if ups_num not in merged:
+            merged[ups_num] = default_item
+            changed = True
+
+    if changed:
+        save_product_data(merged)
+
+    return merged
 
 
-# Load reference data from JSON file
-PRODUCT_DATA = load_reference_data()
+def save_product_data(data):
+    """Save product data to the AppData config file."""
+    config_path = get_product_data_path()
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
+
+# Load product data on startup (merges user edits with any new built-in items)
+PRODUCT_DATA = load_product_data()
 
 
 def get_resource_path(filename):
@@ -288,38 +343,88 @@ class LabelSorter:
         title_label.bind('<Triple-Button-1>', self.open_secret_menu)
     
     def create_preview_text(self):
-        """Create the preview text widget (replaces placeholder)"""
+        """Create the Treeview grid widget (replaces placeholder)"""
         if self.preview_text:
             return
         
         self.preview_placeholder.destroy()
         
-        self.preview_text = tk.Text(
-            self.preview_frame,
-            font=('Consolas', 9),
-            bg='#1a1a1a',
-            fg='#cccccc',
-            insertbackground='white',
-            wrap='none',
-            state='disabled'
+        # Configure Treeview styles for dark theme with grid lines
+        style = ttk.Style()
+        style.configure('Summary.Treeview',
+                        background='#1a1a1a',
+                        foreground='#cccccc',
+                        fieldbackground='#1a1a1a',
+                        rowheight=28,
+                        font=('Segoe UI', 10))
+        style.configure('Summary.Treeview.Heading',
+                        background='#2d2d2d',
+                        foreground='#ffd700',
+                        font=('Segoe UI', 10, 'bold'),
+                        borderwidth=1,
+                        relief='solid')
+        style.map('Summary.Treeview',
+                  background=[('selected', '#E85D04')],
+                  foreground=[('selected', 'white')])
+        style.layout('Summary.Treeview', [
+            ('Summary.Treeview.treearea', {'sticky': 'nswe'})
+        ])
+        
+        # Create container frame
+        tree_container = tk.Frame(self.preview_frame, bg='#1a1a1a')
+        tree_container.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # Create Treeview with columns
+        columns = ('order', 'range', 'weight', 'cost')
+        self.preview_tree = ttk.Treeview(
+            tree_container,
+            columns=columns,
+            show='headings',
+            style='Summary.Treeview'
         )
-        preview_scroll_y = ttk.Scrollbar(self.preview_frame, command=self.preview_text.yview)
-        preview_scroll_x = ttk.Scrollbar(self.preview_frame, orient='horizontal', command=self.preview_text.xview)
-        self.preview_text.configure(yscrollcommand=preview_scroll_y.set, xscrollcommand=preview_scroll_x.set)
         
-        preview_scroll_y.pack(side='right', fill='y')
-        preview_scroll_x.pack(side='bottom', fill='x')
-        self.preview_text.pack(side='left', fill='both', expand=True)
+        # Define headings
+        self.preview_tree.heading('order', text='Order #')
+        self.preview_tree.heading('range', text='Range')
+        self.preview_tree.heading('weight', text='Total Weight')
+        self.preview_tree.heading('cost', text='Total Cost')
         
-        # Preview text tags
-        self.preview_text.tag_configure('order_num', foreground='#E85D04', font=('Consolas', 10, 'bold'))
-        self.preview_text.tag_configure('header', foreground='#E85D04', font=('Consolas', 11, 'bold'))
-        self.preview_text.tag_configure('subheader', foreground='#ffd700', font=('Consolas', 10, 'bold'))
-        self.preview_text.tag_configure('summary_label', foreground='#a0a0a0')
-        self.preview_text.tag_configure('summary_value', foreground='#4ecca3', font=('Consolas', 10))
-        self.preview_text.tag_configure('cost', foreground='#90EE90', font=('Consolas', 10))
-        self.preview_text.tag_configure('cost_highlight', foreground='#E85D04', font=('Consolas', 10, 'bold'))
-        self.preview_text.tag_configure('info', foreground='#87CEEB')
+        # Define column widths and alignment
+        self.preview_tree.column('order', width=120, anchor='w')
+        self.preview_tree.column('range', width=120, anchor='center')
+        self.preview_tree.column('weight', width=140, anchor='e')
+        self.preview_tree.column('cost', width=140, anchor='e')
+        
+        # Add scrollbar
+        tree_scroll = ttk.Scrollbar(tree_container, orient='vertical', command=self.preview_tree.yview)
+        self.preview_tree.configure(yscrollcommand=tree_scroll.set)
+        
+        tree_scroll.pack(side='right', fill='y')
+        self.preview_tree.pack(side='left', fill='both', expand=True)
+        
+        # Configure row tags for styling
+        self.preview_tree.tag_configure('normal', foreground='#cccccc')
+        self.preview_tree.tag_configure('cost_high', foreground='#E85D04')
+        self.preview_tree.tag_configure('glasses', foreground='#87CEEB')
+        self.preview_tree.tag_configure('total_row', foreground='#ffd700', font=('Segoe UI', 10, 'bold'))
+        self.preview_tree.tag_configure('total_high', foreground='#E85D04', font=('Segoe UI', 10, 'bold'))
+        
+        # Totals label below the tree
+        self.totals_frame = tk.Frame(self.preview_frame, bg='#1a1a1a')
+        self.totals_frame.pack(fill='x', padx=5, pady=(0, 5))
+        
+        self.totals_label = tk.Label(
+            self.totals_frame,
+            text="",
+            font=('Segoe UI', 10, 'bold'),
+            bg='#1a1a1a',
+            fg='#E85D04',
+            anchor='w'
+        )
+        self.totals_label.pack(fill='x', padx=10)
+        
+        # Mark as created (reuse self.preview_text as a flag for compatibility)
+        self.preview_text = True
     
     def create_duplicate_tab(self):
         """Create the duplicate report tab (only when duplicates exist)"""
@@ -545,7 +650,7 @@ class LabelSorter:
         # Calculate order summaries (weight and cost per order group)
         # For 5330 items: group by full order number (including suffix)
         # For other items: group by first 6 digits of order number (before the "-")
-        order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'sub_orders': set()})
+        order_summaries = defaultdict(lambda: {'weight': 0.0, 'cost': 0.0, 'sub_orders': set(), 'ups_numbers': set()})
         
         # Process 5330 items separately - group by full order number
         for order_num in item_5330_records.keys():
@@ -559,6 +664,7 @@ class LabelSorter:
                 sub_order = '000'
             
             order_summaries[order_base]['sub_orders'].add(sub_order)
+            order_summaries[order_base]['ups_numbers'].add(ITEM_5330_UPS)
             
             # Calculate cost and weight for consolidated 5330 items
             if ITEM_5330_UPS in PRODUCT_DATA:
@@ -577,6 +683,7 @@ class LabelSorter:
             
             # Track sub-order numbers for range display
             order_summaries[order_base]['sub_orders'].add(sub_order)
+            order_summaries[order_base]['ups_numbers'].add(ups_number)
             
             # Look up data by UPS# - only include known items in totals
             if ups_number in PRODUCT_DATA:
@@ -647,60 +754,56 @@ class LabelSorter:
         self.notebook.select(0)
     
     def update_preview(self):
-        """Update the preview tab with order summary table"""
-        if not self.preview_text:
+        """Update the preview tab with order summary Treeview grid"""
+        if not self.preview_text or not hasattr(self, 'preview_tree'):
             return
         
-        self.preview_text.config(state='normal')
-        self.preview_text.delete('1.0', tk.END)
+        # Clear existing rows
+        for item in self.preview_tree.get_children():
+            self.preview_tree.delete(item)
         
         if hasattr(self, 'order_summaries') and self.order_summaries:
-            # Header
-            self.preview_text.insert(tk.END, "═" * 70 + "\n", 'header')
-            self.preview_text.insert(tk.END, "  ORDER SUMMARY\n", 'header')
-            self.preview_text.insert(tk.END, "═" * 70 + "\n\n", 'header')
-            
-            # Column headers
-            self.preview_text.insert(tk.END, f"  {'Order #':<10} {'Range':<12} {'Total Weight':>14} {'Total Cost':>14}\n", 'subheader')
-            self.preview_text.insert(tk.END, "  " + "─" * 54 + "\n", 'summary_label')
-            
-            # Calculate grand totals
             grand_weight = 0.0
             grand_cost = 0.0
             
-            # Display each order summary
             for order_num in sorted(self.order_summaries.keys()):
                 summary = self.order_summaries[order_num]
                 weight = summary['weight']
                 cost = summary['cost']
                 order_range = summary.get('order_range', '')
+                ups_numbers = summary.get('ups_numbers', set())
                 grand_weight += weight
                 grand_cost += cost
                 
-                self.preview_text.insert(tk.END, f"  ", 'summary_label')
-                self.preview_text.insert(tk.END, f"{order_num:<10}", 'order_num')
-                self.preview_text.insert(tk.END, f" {order_range:<11}", 'summary_label')
-                self.preview_text.insert(tk.END, f" {weight:>12.2f} lb", 'summary_value')
+                # Determine display prefix — sunglasses emoji for glasses orders
+                has_glasses = ITEM_5330_UPS in ups_numbers
+                order_display = f"\U0001f576\ufe0f {order_num}" if has_glasses else order_num
                 
-                # Highlight costs >= $100 in orange
-                if cost >= 100:
-                    self.preview_text.insert(tk.END, f" {cost:>13.2f}\n", 'cost_highlight')
+                weight_str = f"{weight:.2f} lb"
+                cost_str = f"${cost:.2f}"
+                
+                # Choose tag based on cost threshold
+                if has_glasses:
+                    tag = 'glasses'
+                elif cost >= 100:
+                    tag = 'cost_high'
                 else:
-                    self.preview_text.insert(tk.END, f" {cost:>13.2f}\n", 'cost')
+                    tag = 'normal'
+                
+                self.preview_tree.insert('', 'end',
+                    values=(order_display, order_range, weight_str, cost_str),
+                    tags=(tag,))
             
-            # Grand total (cost only)
-            self.preview_text.insert(tk.END, "  " + "─" * 54 + "\n", 'summary_label')
-            self.preview_text.insert(tk.END, f"  {'TOTAL':<10} {'':<12} {'':<15}", 'header')
-            if grand_cost >= 100:
-                self.preview_text.insert(tk.END, f" {grand_cost:>13.2f}\n", 'cost_highlight')
-            else:
-                self.preview_text.insert(tk.END, f" {grand_cost:>13.2f}\n", 'cost')
+            # Add total row
+            total_tag = 'total_high' if grand_cost >= 100 else 'total_row'
+            self.preview_tree.insert('', 'end',
+                values=('TOTAL', '', f"{grand_weight:.2f} lb", f"${grand_cost:.2f}"),
+                tags=(total_tag,))
             
-            self.preview_text.insert(tk.END, "\n" + "═" * 70 + "\n", 'header')
-            self.preview_text.insert(tk.END, f"  Total Unique Orders: {len(self.order_summaries)}\n", 'info')
-            self.preview_text.insert(tk.END, "═" * 70 + "\n", 'header')
-        
-        self.preview_text.config(state='disabled')
+            # Update totals label
+            self.totals_label.config(
+                text=f"  Total Unique Orders: {len(self.order_summaries)}"
+            )
     
     def update_report(self, order_counts, duplicates, address_counts, duplicate_addresses):
         """Update the duplicate report tab"""
@@ -1053,7 +1156,7 @@ class LabelSorter:
             tk.Button(btn_frame, text="Cancel", command=add_dialog.destroy, bg='#6B6B6B', fg='white', font=('Segoe UI', 10), padx=15).pack(side='left', padx=5)
         
         def save_all_changes():
-            """Save all changes to the JSON file"""
+            """Save all changes to the AppData config file"""
             # Update PRODUCT_DATA from entry widgets
             for ups_num, widgets in entry_widgets.items():
                 try:
@@ -1066,24 +1169,10 @@ class LabelSorter:
                     messagebox.showerror("Error", f"Invalid number format for UPS# {ups_num}")
                     return
             
-            # Save to JSON file
+            # Save to AppData
             try:
-                json_path = get_reference_data_path()
-                # For compiled EXE, save to the same directory as the EXE
-                if hasattr(sys, '_MEIPASS'):
-                    json_path = os.path.join(os.path.dirname(sys.executable), 'reference_data.json')
-                
-                data = {
-                    "products": PRODUCT_DATA,
-                    "_comments": {
-                        "description": "Reference data for KAS Label Sorter - Products lookup by UPS# (RC02 field)",
-                        "format": "UPS#: {part: PartNumber, pack_price: Price, pack_weight: Weight in lbs}"
-                    }
-                }
-                
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2)
-                
+                save_product_data(PRODUCT_DATA)
+                json_path = get_product_data_path()
                 messagebox.showinfo("Saved", f"Reference data saved successfully!\n\n{json_path}")
             except Exception as e:
                 messagebox.showerror("Error", f"Could not save: {e}")
@@ -1113,7 +1202,7 @@ class LabelSorter:
         # Info label at bottom
         info_label = tk.Label(
             editor,
-            text=f"📂 Data file: {get_reference_data_path()}",
+            text=f"\U0001f4c2 Data file: {get_product_data_path()}",
             font=('Segoe UI', 8),
             bg='#1a1a1a',
             fg='#555555'
